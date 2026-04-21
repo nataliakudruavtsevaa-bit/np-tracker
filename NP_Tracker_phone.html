@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NP Tracker</title>
+  <meta name="theme-color" content="#6d7ae8" />
+  <style>
+    :root{
+      --bg1:#ffffff; --bg2:#f6f4ff; --bg3:#f0edff; --card:#ffffffee; --soft:#faf9ff;
+      --primary:#6d7ae8; --text:#334155; --muted:#94a3b8; --green:#9ee2c9; --green-2:#eefaf4;
+      --field:#f4f1ff; --shadow:0 12px 40px rgba(73,54,138,.08);
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--text);
+      background:radial-gradient(circle at top,var(--bg1) 0%,var(--bg2) 42%,var(--bg3) 100%)}
+    .app{max-width:430px;margin:0 auto;padding:24px 16px 40px}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.8);border-radius:32px;box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+    .hero{border-radius:34px;overflow:hidden;box-shadow:0 16px 48px rgba(73,54,138,.10)}
+    .row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.muted{color:var(--muted)}.small{font-size:12px}.tiny{font-size:11px}
+    .title{font-size:30px;font-weight:800;letter-spacing:-.03em;color:#1f2937}.subtitle{font-size:14px;color:var(--muted);margin-top:4px}
+    .badge{background:#f3efff;color:var(--primary);padding:10px 12px;border-radius:22px;font-size:14px;font-weight:600}
+    .week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.day{background:#fbfaff;border-radius:22px;padding:12px 8px;text-align:center}
+    .day.active{background:#ede8ff;outline:1px solid #d9cffd}.dot{width:10px;height:10px;border-radius:999px;background:#e5e7eb;margin:8px auto 0}.dot.done{background:var(--green)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .mini-card{border-radius:28px;background:white;border:1px solid rgba(255,255,255,.8);box-shadow:0 12px 34px rgba(46,44,87,.08);padding:16px}
+    .label-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.label{font-size:14px;font-weight:600;color:var(--muted)}
+    .icon{width:36px;height:36px;border-radius:18px;background:#f3efff;display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:16px}
+    input, select, button{font:inherit} input, select{width:100%;border:none;outline:none;background:var(--field);border-radius:20px;padding:12px 14px;color:var(--text)}
+    .input-lg{font-size:24px;font-weight:700}.btn{border:none;border-radius:20px;padding:10px 14px;cursor:pointer}
+    .btn-primary{background:var(--primary);color:white;font-weight:600}.btn-soft{background:var(--field);color:#64748b;font-weight:600}.btn-green{background:var(--green-2);color:#047857;font-weight:600}
+    .progress{height:10px;border-radius:999px;background:#f1f5f9;margin-top:8px;overflow:hidden}.progress>div{height:100%;background:var(--green);border-radius:999px}
+    .section-title{font-size:30px;font-weight:700;letter-spacing:-.03em;color:#1f2937}.section-subtitle{font-size:14px;color:var(--muted);margin-top:4px}
+    .pill{border-radius:24px;background:var(--soft);padding:16px}.pill .big{font-size:30px;font-weight:700;letter-spacing:-.03em;margin-top:8px}
+    .stack{display:flex;flex-direction:column;gap:12px}
+    .habit{display:flex;align-items:center;gap:12px;border:1px solid #e2e8f0;border-radius:24px;padding:16px;background:white;cursor:pointer}
+    .habit.done{border-color:#cfeedd;background:#f2fcf7}.check{width:44px;height:44px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;font-weight:700}
+    .habit.done .check{background:#ccf0df}.habit-title{font-size:18px;font-weight:600}.habit-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+    .delete-btn{background:#fff1f2;color:#e11d48;border:none;border-radius:16px;padding:7px 10px;font-size:12px;font-weight:600}
+    .week-goals.monday{border-color:#ddd2ff;background:linear-gradient(180deg,#f3efff 0%,#ffffff 100%);box-shadow:var(--shadow),0 0 0 2px #e4dcff inset}
+    .header-line{display:flex;align-items:center;gap:8px;font-size:30px;font-weight:700;letter-spacing:-.03em;color:#1f2937}
+    .new-week{background:white;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--primary)}
+    canvas{width:100%;display:block}
+    @media (max-width:380px){.grid2,.fields{grid-template-columns:1fr}.col2{grid-column:auto}}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+<script>
+(function(){
+  const todayIso = new Date().toISOString().slice(0,10);
+  const targetWeight = 66;
+  const baseHabits = [
+    { id: 'alcohol', title: 'Без алкоголя', icon: '🍷' },
+    { id: 'vape', title: 'Без электронок', icon: '🚭' },
+    { id: 'sleep', title: 'Режим сна', icon: '🌙' },
+  ];
+  const trainingTypes = ['Кардио', 'Силовая', 'Зарядка'];
+  const defaultDaily = {steps:'',workoutDone:false,workoutType:'',calories:'',protein:'',fats:'',carbs:'',weight:'',cycle:false,habits:{}};
+  const initialSettings = {defaultStepGoal:10000,defaultCalorieGoal:1600,defaultProteinGoal:120,defaultFatsGoal:55,defaultCarbsGoal:150};
+
+  function dateFromIso(iso){ return new Date(iso + 'T12:00:00'); }
+  function toIso(d){ return d.toISOString().slice(0,10); }
+  function getWeekStart(iso){ const d=dateFromIso(iso); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return toIso(d); }
+  function getWeekDatesCentered(anchorIso){ const anchor=dateFromIso(anchorIso); const arr=[]; for(let i=-1;i<=5;i++){ const d=new Date(anchor); d.setDate(anchor.getDate()+i); arr.push(toIso(d)); } return arr; }
+  function fmtShortDate(iso){ return dateFromIso(iso).toLocaleDateString('ru-RU',{day:'numeric',month:'long'}); }
+  function isMonday(iso){ return dateFromIso(iso).getDay()===1; }
+  function safeParse(v){ const n=Number(String(v).replace(',','.')); return Number.isFinite(n)? n : 0; }
+  function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  const STORAGE='np-tracker-phone-v1';
+
+  function loadState(){
+    const raw=localStorage.getItem(STORAGE);
+    if(raw){ try { return JSON.parse(raw); } catch(e){} }
+    const currentWeekStart=getWeekStart(todayIso);
+    const daily={};
+    daily[todayIso]={...defaultDaily,habits:{alcohol:false,vape:false,sleep:false}};
+    return {
+      settings: initialSettings,
+      customHabits: [],
+      weightData: [],
+      daily,
+      weeklyGoals: {
+        [currentWeekStart]: {
+          stepGoal: initialSettings.defaultStepGoal * 7,
+          calorieGoal: initialSettings.defaultCalorieGoal * 7,
+          proteinGoal: initialSettings.defaultProteinGoal * 7,
+          fatsGoal: initialSettings.defaultFatsGoal * 7,
+          carbsGoal: initialSettings.defaultCarbsGoal * 7,
+          dailyStepGoal: initialSettings.defaultStepGoal,
+          dailyCalorieGoal: initialSettings.defaultCalorieGoal,
+          dailyProteinGoal: initialSettings.defaultProteinGoal,
+          dailyFatsGoal: initialSettings.defaultFatsGoal,
+          dailyCarbsGoal: initialSettings.defaultCarbsGoal,
+        }
+      },
+      expandedHabits: true,
+      expandedNutritionGoals: true,
+      expandedWeeklyGoals: isMonday(todayIso),
+    };
+  }
+
+  let state=loadState();
+
+  function save(){ localStorage.setItem(STORAGE, JSON.stringify(state)); }
+  function getAllHabits(){ return [...baseHabits, ...state.customHabits]; }
+  function ensureToday(){
+    if(!state.daily[todayIso]){
+      const habits={}; getAllHabits().forEach(h=>habits[h.id]=false);
+      state.daily[todayIso]={...defaultDaily,habits};
+    } else {
+      state.daily[todayIso].habits ||= {};
+      getAllHabits().forEach(h=>{ if(typeof state.daily[todayIso].habits[h.id]==='undefined') state.daily[todayIso].habits[h.id]=false; });
+    }
+  }
+  function getCurrentWeekGoal(){
+    const currentWeekStart=getWeekStart(todayIso);
+    return state.weeklyGoals[currentWeekStart] || {
+      stepGoal: state.settings.defaultStepGoal * 7,
+      calorieGoal: state.settings.defaultCalorieGoal * 7,
+      proteinGoal: state.settings.defaultProteinGoal * 7,
+      fatsGoal: state.settings.defaultFatsGoal * 7,
+      carbsGoal: state.settings.defaultCarbsGoal * 7,
+      dailyStepGoal: state.settings.defaultStepGoal,
+      dailyCalorieGoal: state.settings.defaultCalorieGoal,
+      dailyProteinGoal: state.settings.defaultProteinGoal,
+      dailyFatsGoal: state.settings.defaultFatsGoal,
+      dailyCarbsGoal: state.settings.defaultCarbsGoal,
+    };
+  }
+  function isDayComplete(iso){
+    const d=state.daily[iso]; if(!d) return false;
+    const habitsDone=getAllHabits().every(h=>Boolean(d.habits?.[h.id]));
+    return Boolean(d.weight!=='' && d.steps!=='' && d.workoutType && d.calories!=='' && habitsDone);
+  }
+  function getWeekTotals(){
+    const currentWeekStart=getWeekStart(todayIso);
+    return Object.keys(state.daily).filter(iso=>getWeekStart(iso)===currentWeekStart).reduce((acc,iso)=>{
+      const day=state.daily[iso] || {};
+      acc.steps+=safeParse(day.steps); acc.calories+=safeParse(day.calories); acc.protein+=safeParse(day.protein); acc.fats+=safeParse(day.fats); acc.carbs+=safeParse(day.carbs);
+      return acc;
+    },{steps:0,calories:0,protein:0,fats:0,carbs:0});
+  }
+  function calcWeekProgress(){
+    const goal=getCurrentWeekGoal(); const total=getWeekTotals();
+    return {
+      steps: Math.min(Math.round((total.steps/Math.max(goal.stepGoal,1))*100),999),
+      calories: Math.min(Math.round((total.calories/Math.max(goal.calorieGoal,1))*100),999),
+      protein: Math.min(Math.round((total.protein/Math.max(goal.proteinGoal,1))*100),999),
+      fats: Math.min(Math.round((total.fats/Math.max(goal.fatsGoal,1))*100),999),
+      carbs: Math.min(Math.round((total.carbs/Math.max(goal.carbsGoal,1))*100),999),
+    };
+  }
+  function computeWeightSeries(){
+    const byWeek={}; (state.weightData||[]).forEach(item=>{ const week=getWeekStart(item.date); byWeek[week] ||= []; byWeek[week].push(safeParse(item.value)); });
+    return Object.entries(byWeek).map(([week,arr])=>({date:week,value:Number((arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1))})).sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  function computeWeeklySteps(){
+    const byWeek={}; Object.entries(state.daily).forEach(([iso,item])=>{ const week=getWeekStart(iso); byWeek[week] ||= []; const val=safeParse(item.steps); if(val>0) byWeek[week].push(val); });
+    return Object.entries(byWeek).map(([week,arr])=>({label:dateFromIso(week).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}), value:arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):0})).filter(x=>x.value>0);
+  }
+  function addHabit(){
+    const input=document.getElementById('new-habit-input'); const title=(input.value||'').trim(); if(!title) return;
+    const id='custom_'+Date.now(); state.customHabits.push({id,title,icon:'•'});
+    Object.keys(state.daily).forEach(date=>{ state.daily[date].habits ||= {}; state.daily[date].habits[id]=false; });
+    input.value=''; rerender();
+  }
+  function removeHabit(id){
+    state.customHabits=state.customHabits.filter(h=>h.id!==id);
+    Object.keys(state.daily).forEach(date=>{ if(state.daily[date].habits) delete state.daily[date].habits[id]; });
+    rerender();
+  }
+  function setWeeklyGoal(field, value){
+    const currentWeekStart=getWeekStart(todayIso); const base=getCurrentWeekGoal(); const numeric=safeParse(value); const next={...base,[field]:numeric};
+    if(field==='dailyStepGoal') next.stepGoal=numeric*7;
+    if(field==='dailyCalorieGoal') next.calorieGoal=numeric*7;
+    if(field==='dailyProteinGoal') next.proteinGoal=numeric*7;
+    if(field==='dailyFatsGoal') next.fatsGoal=numeric*7;
+    if(field==='dailyCarbsGoal') next.carbsGoal=numeric*7;
+    state.weeklyGoals[currentWeekStart]=next; rerender();
+  }
+
+  function roundRect(ctx, x, y, w, h, r){
+    if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2;
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  function drawLineChart(canvas, data, target){
+    if(!canvas || !data.length) return;
+    const ctx=canvas.getContext('2d'); const width=canvas.clientWidth; const height=176;
+    canvas.width=width*devicePixelRatio; canvas.height=height*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    const pad=20; ctx.clearRect(0,0,width,height);
+    const vals=data.map(d=>d.value); const min=Math.min(...vals,target)-0.3; const max=Math.max(...vals,target)+0.3;
+    const x=i=>pad + (i*(width-pad*2))/Math.max(data.length-1,1); const y=v=>height-pad-((v-min)/(max-min||1))*(height-pad*2); const ty=y(target);
+    ctx.setLineDash([4,5]); ctx.strokeStyle='#cdc7ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pad,ty); ctx.lineTo(width-pad,ty); ctx.stroke(); ctx.setLineDash([]);
+    const grad=ctx.createLinearGradient(0,0,width,height); grad.addColorStop(0,'#8b8ff7'); grad.addColorStop(1,'#6d7ae8');
+    ctx.strokeStyle=grad; ctx.lineWidth=4; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.beginPath();
+    data.forEach((d,i)=>{ const px=x(i),py=y(d.value); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }); ctx.stroke();
+    data.forEach((d,i)=>{ const px=x(i),py=y(d.value); ctx.fillStyle='white'; ctx.strokeStyle='#7c83ea'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(px,py,5,0,Math.PI*2); ctx.fill(); ctx.stroke(); });
+  }
+  function drawBarChart(canvas, data, maxValue){
+    if(!canvas || !data.length) return;
+    const ctx=canvas.getContext('2d'); const width=canvas.clientWidth; const height=160;
+    canvas.width=width*devicePixelRatio; canvas.height=height*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    const pad=20; ctx.clearRect(0,0,width,height); const barWidth=(width-pad*2)/Math.max(data.length*1.6,1); const gap=barWidth*0.6;
+    data.forEach((item,i)=>{ const x=pad+i*(barWidth+gap); const hh=((item.value||0)/(maxValue||1))*(height-pad*2); const y=height-pad-hh;
+      ctx.fillStyle='#c9eadc'; roundRect(ctx,x,y,barWidth,hh,12); ctx.fill(); ctx.fillStyle='#64748b'; ctx.font='11px -apple-system, sans-serif'; ctx.fillText(String(item.value), x + barWidth/2 - ctx.measureText(String(item.value)).width/2, y-6);
+      ctx.fillStyle='#94a3b8'; ctx.fillText(item.label, x + barWidth/2 - ctx.measureText(item.label).width/2, height-4);
+    });
+  }
+
+  function rerender(){
+    ensureToday(); save();
+    const app=document.getElementById('app'); const allHabits=getAllHabits(); const weekDates=getWeekDatesCentered(todayIso); const currentWeekStart=getWeekStart(todayIso);
+    const goal=getCurrentWeekGoal(); const today=state.daily[todayIso]; const weekCompletion=weekDates.filter(isDayComplete).length;
+    const habitCompletionPercent=allHabits.length ? Math.round(allHabits.filter(h=>Boolean(today.habits?.[h.id])).length / allHabits.length * 100) : 0;
+    const latestWeight=state.weightData.length ? state.weightData[state.weightData.length-1].value : '';
+    const leftToGoal=latestWeight==='' ? '—' : Math.max(safeParse(latestWeight)-targetWeight,0).toFixed(1);
+    const stepsProgressToday=Math.min(Math.round((safeParse(today.steps)/Math.max(state.settings.defaultStepGoal,1))*100),100);
+    const caloriesDiffDay=today.calories==='' ? '—' : ((safeParse(today.calories)-state.settings.defaultCalorieGoal)>0?'+':'') + (safeParse(today.calories)-state.settings.defaultCalorieGoal);
+    const totals=getWeekTotals(); const progress=calcWeekProgress(); const weeklyWeight=computeWeightSeries(); const weeklySteps=computeWeeklySteps();
+    const workoutDays=weekDates.map(d=>state.daily[d]).filter(Boolean).filter(d=>d.workoutDone);
+    const workoutStats={ total: workoutDays.length, cardio: workoutDays.filter(x=>x.workoutType==='Кардио').length, strength: workoutDays.filter(x=>x.workoutType==='Силовая').length, warmup: workoutDays.filter(x=>x.workoutType==='Зарядка').length };
+
+    app.innerHTML = `
+      <div class="app">
+        <div class="card hero">
+          <div class="row">
+            <div>
+              <div class="small muted" style="text-transform:uppercase;letter-spacing:.22em">сегодня</div>
+              <div class="title">${fmtShortDate(todayIso)}</div>
+              <div class="subtitle">Твоя личная панель прогресса</div>
+            </div>
+            <div class="badge">${weekCompletion}/7 заполнено</div>
+          </div>
+          <div class="week" style="margin-top:16px">
+            ${weekDates.map(iso=>{ const d=dateFromIso(iso); return `<div class="day ${iso===todayIso?'active':''}"><div class="tiny muted" style="font-weight:600;text-transform:uppercase">${d.toLocaleDateString('ru-RU',{weekday:'short'})}</div><div style="margin-top:4px;font-size:18px;font-weight:700;color:#334155">${d.getDate()}</div><div class="dot ${isDayComplete(iso)?'done':''}"></div></div>`; }).join('')}
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="mini-card">
+            <div class="label-row"><div class="label">Вес</div><div class="icon">⚖️</div></div>
+            <div style="display:flex;align-items:center;gap:8px"><input id="weight-input" class="input-lg" value="${esc(today.weight)}" /><span class="muted">кг</span></div>
+            <button class="btn btn-primary" style="margin-top:12px" id="save-weight-btn">Сохранить</button>
+          </div>
+          <div class="mini-card">
+            <div class="label-row"><div class="label">Шаги</div><div class="icon">👣</div></div>
+            <input id="steps-input" class="input-lg" value="${esc(today.steps)}" />
+            <div style="margin-top:12px" class="small muted">цель на день ${state.settings.defaultStepGoal.toLocaleString('ru-RU')}</div>
+            <div class="progress"><div style="width:${stepsProgressToday}%"></div></div>
+          </div>
+          <div class="mini-card">
+            <div class="label-row"><div class="label">Тренировка</div><div class="icon">🏋️</div></div>
+            <button class="btn ${today.workoutDone ? 'btn-green' : 'btn-soft'}" id="toggle-training-btn">${today.workoutDone ? 'Тренировка отмечена' : 'Отметить тренировку'}</button>
+            <select id="training-type" style="margin-top:12px">
+              <option value="">Выбрать тип</option>
+              ${trainingTypes.map(t=>`<option value="${t}" ${today.workoutType===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mini-card">
+            <div class="label-row"><div class="label">Цикл</div><div class="icon">◐</div></div>
+            <button class="btn ${today.cycle ? 'btn-green' : 'btn-soft'}" id="toggle-cycle-btn">${today.cycle ? 'Есть цикл' : 'Нет цикла'}</button>
+            <div style="margin-top:12px" class="small muted">Маркер на текущий день</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <div><div class="section-title">Калории и рацион</div><div class="section-subtitle">Ежедневный ввод калорий и БЖУ</div></div>
+            <div class="icon">🔥</div>
+          </div>
+          <div class="fields" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <input class="col2" id="calories-input" value="${esc(today.calories)}" placeholder="Калории за день" />
+            <input id="protein-input" value="${esc(today.protein)}" placeholder="Белки" />
+            <input id="fats-input" value="${esc(today.fats)}" placeholder="Жиры" />
+            <input class="col2" id="carbs-input" value="${esc(today.carbs)}" placeholder="Углеводы" />
+          </div>
+          <button class="btn btn-soft" style="margin-top:12px" id="toggle-nutrition-goals-btn">${state.expandedNutritionGoals ? 'Скрыть недельную динамику' : 'Показать недельную динамику'}</button>
+          ${state.expandedNutritionGoals ? `
+            <div class="grid2" style="margin-top:12px">
+              <div class="pill"><div class="small muted">Калории за неделю</div><div class="big">${progress.calories}%</div><div class="tiny muted">${totals.calories} / ${goal.calorieGoal}</div></div>
+              <div class="pill"><div class="small muted">Белки за неделю</div><div class="big">${progress.protein}%</div><div class="tiny muted">${totals.protein} / ${goal.proteinGoal}</div></div>
+              <div class="pill"><div class="small muted">Жиры за неделю</div><div class="big">${progress.fats}%</div><div class="tiny muted">${totals.fats} / ${goal.fatsGoal}</div></div>
+              <div class="pill"><div class="small muted">Углеводы за неделю</div><div class="big">${progress.carbs}%</div><div class="tiny muted">${totals.carbs} / ${goal.carbsGoal}</div></div>
+            </div>` : ''}
+          <div style="margin-top:12px" class="small muted">отклонение по калориям за день: ${caloriesDiffDay}</div>
+        </div>
+
+        <div class="card">
+          <div class="row toggle" id="toggle-habits-btn">
+            <div><div class="section-title">Трекер привычек</div><div class="section-subtitle">Можно добавлять и удалять привычки вручную</div></div>
+            <div class="icon">${state.expandedHabits ? '⌃' : '⌄'}</div>
+          </div>
+          ${state.expandedHabits ? `
+            <div style="display:flex;gap:8px;margin-top:12px"><input id="new-habit-input" placeholder="Новая привычка" /><button class="btn btn-primary" id="add-habit-btn">Добавить</button></div>
+            <div class="stack" style="margin-top:12px">
+              ${allHabits.map(h=>`<div class="habit ${today.habits?.[h.id] ? 'done':''}" data-habit="${h.id}">
+                <div class="check">${today.habits?.[h.id] ? '✓' : '○'}</div>
+                <div class="habit-title">${esc(h.title)}</div>
+                <div class="habit-actions">
+                  ${String(h.id).startsWith('custom_') ? `<button class="delete-btn" data-delete="${h.id}">Удалить</button>` : ''}
+                  <div class="icon" style="width:36px;height:36px">${h.icon}</div>
+                </div>
+              </div>`).join('')}
+            </div>` : ''}
+        </div>
+
+        <div class="card week-goals ${isMonday(todayIso)?'monday':''}">
+          <div class="row toggle" id="toggle-weekly-goals-btn">
+            <div>
+              <div class="header-line">Цели недели ${isMonday(todayIso) ? '✨' : ''}</div>
+              <div class="section-subtitle">Вводишь цель на день, приложение считает неделю × 7</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">${isMonday(todayIso)?'<span class="new-week">Новая неделя</span>':''}<div class="icon">${state.expandedWeeklyGoals ? '⌃' : '⌄'}</div></div>
+          </div>
+          <div class="row" style="margin-top:12px;align-items:center">
+            <div class="badge" style="font-size:12px;background:white;color:#64748b">неделя с ${dateFromIso(currentWeekStart).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</div>
+            <div class="tiny muted">заполняется по понедельникам</div>
+          </div>
+          ${state.expandedWeeklyGoals ? `
+            <div class="grid2" style="margin-top:12px">
+              <div class="pill"><div class="tiny muted" style="font-weight:600;margin-bottom:8px">Шаги в день</div><input id="goal-step" value="${esc(goal.dailyStepGoal)}" placeholder="Например 10000" /><div class="tiny muted" style="margin-top:8px">На неделю: ${goal.stepGoal.toLocaleString('ru-RU')}</div></div>
+              <div class="pill"><div class="tiny muted" style="font-weight:600;margin-bottom:8px">Калории в день</div><input id="goal-calorie" value="${esc(goal.dailyCalorieGoal)}" placeholder="Например 1600" /><div class="tiny muted" style="margin-top:8px">На неделю: ${goal.calorieGoal}</div></div>
+              <div class="pill"><div class="tiny muted" style="font-weight:600;margin-bottom:8px">Белки в день</div><input id="goal-protein" value="${esc(goal.dailyProteinGoal)}" placeholder="Например 120" /><div class="tiny muted" style="margin-top:8px">На неделю: ${goal.proteinGoal}</div></div>
+              <div class="pill"><div class="tiny muted" style="font-weight:600;margin-bottom:8px">Жиры в день</div><input id="goal-fats" value="${esc(goal.dailyFatsGoal)}" placeholder="Например 55" /><div class="tiny muted" style="margin-top:8px">На неделю: ${goal.fatsGoal}</div></div>
+              <div class="pill" style="grid-column:span 2"><div class="tiny muted" style="font-weight:600;margin-bottom:8px">Углеводы в день</div><input id="goal-carbs" value="${esc(goal.dailyCarbsGoal)}" placeholder="Например 150" /><div class="tiny muted" style="margin-top:8px">На неделю: ${goal.carbsGoal}</div></div>
+            </div>` : ''}
+        </div>
+
+        <div class="card">
+          <div class="row"><div><div class="section-title">Прогресс</div><div class="section-subtitle">На сегодня и за неделю</div></div><div class="icon">📊</div></div>
+          <div class="grid2" style="margin-top:12px">
+            <div class="pill"><div class="small muted">Привычки сегодня</div><div class="big">${habitCompletionPercent}%</div></div>
+            <div class="pill"><div class="small muted">Шаги сегодня</div><div class="big">${stepsProgressToday}%</div></div>
+            <div class="pill"><div class="small muted">Шаги за неделю</div><div class="big">${progress.steps}%</div><div class="tiny muted">${totals.steps.toLocaleString('ru-RU')} / ${goal.stepGoal.toLocaleString('ru-RU')}</div></div>
+            <div class="pill"><div class="small muted">Калории за неделю</div><div class="big">${progress.calories}%</div><div class="tiny muted">${totals.calories} / ${goal.calorieGoal}</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row"><div><div class="section-title">Динамика веса</div><div class="section-subtitle">Средний вес по неделям</div></div><div class="icon">📈</div></div>
+          <div class="grid2" style="margin-top:12px">
+            <div class="pill"><div class="small muted">Текущий вес</div><div class="big">${latestWeight === '' ? '—' : latestWeight + ' кг'}</div></div>
+            <div class="pill"><div class="small muted">Осталось до цели</div><div class="big">${leftToGoal === '—' ? '—' : leftToGoal + ' кг'}</div></div>
+          </div>
+          <div style="margin-top:8px"><canvas id="weight-chart" height="176"></canvas></div>
+          <div class="small muted">линия показывает средние значения по неделям</div>
+        </div>
+
+        <div class="card">
+          <div><div class="section-title">Недельные шаги</div><div class="section-subtitle">Среднее число шагов по неделям</div></div>
+          <div style="margin-top:8px"><canvas id="steps-chart" height="160"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div><div class="section-title">Тренировки за неделю</div></div>
+          <div class="grid2" style="margin-top:12px">
+            <div class="pill"><div class="small muted">Всего</div><div class="big">${workoutStats.total}</div></div>
+            <div class="pill"><div class="small muted">Кардио</div><div class="big">${workoutStats.cardio}</div></div>
+            <div class="pill"><div class="small muted">Силовая</div><div class="big">${workoutStats.strength}</div></div>
+            <div class="pill"><div class="small muted">Зарядка</div><div class="big">${workoutStats.warmup}</div></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('weight-input').oninput = e => { state.daily[todayIso].weight = e.target.value; save(); };
+    document.getElementById('steps-input').oninput = e => { state.daily[todayIso].steps = e.target.value; rerender(); };
+    document.getElementById('calories-input').oninput = e => { state.daily[todayIso].calories = e.target.value; rerender(); };
+    document.getElementById('protein-input').oninput = e => { state.daily[todayIso].protein = e.target.value; rerender(); };
+    document.getElementById('fats-input').oninput = e => { state.daily[todayIso].fats = e.target.value; rerender(); };
+    document.getElementById('carbs-input').oninput = e => { state.daily[todayIso].carbs = e.target.value; rerender(); };
+
+    document.getElementById('save-weight-btn').onclick = () => {
+      const val = safeParse(state.daily[todayIso].weight);
+      if(!val) return;
+      state.weightData = (state.weightData || []).filter(x => x.date !== todayIso).concat([{date: todayIso, value: val}]).sort((a,b)=>a.date.localeCompare(b.date));
+      rerender();
+    };
+    document.getElementById('toggle-training-btn').onclick = () => {
+      state.daily[todayIso].workoutDone = !state.daily[todayIso].workoutDone;
+      if(state.daily[todayIso].workoutDone && !state.daily[todayIso].workoutType) state.daily[todayIso].workoutType = trainingTypes[0];
+      if(!state.daily[todayIso].workoutDone) state.daily[todayIso].workoutType = '';
+      rerender();
+    };
+    document.getElementById('training-type').onchange = e => { state.daily[todayIso].workoutType = e.target.value; state.daily[todayIso].workoutDone = Boolean(e.target.value); rerender(); };
+    document.getElementById('toggle-cycle-btn').onclick = () => { state.daily[todayIso].cycle = !state.daily[todayIso].cycle; rerender(); };
+    document.getElementById('toggle-nutrition-goals-btn').onclick = () => { state.expandedNutritionGoals = !state.expandedNutritionGoals; rerender(); };
+    document.getElementById('toggle-habits-btn').onclick = () => { state.expandedHabits = !state.expandedHabits; rerender(); };
+    document.getElementById('toggle-weekly-goals-btn').onclick = () => { state.expandedWeeklyGoals = !state.expandedWeeklyGoals; rerender(); };
+
+    const addBtn = document.getElementById('add-habit-btn');
+    if(addBtn) addBtn.onclick = addHabit;
+    const newHabitInput = document.getElementById('new-habit-input');
+    if(newHabitInput) newHabitInput.onkeydown = e => { if(e.key === 'Enter') addHabit(); };
+
+    document.querySelectorAll('[data-habit]').forEach(el => el.onclick = () => { toggleHabit(el.getAttribute('data-habit')); });
+    document.querySelectorAll('[data-delete]').forEach(el => el.onclick = (e) => { e.stopPropagation(); removeHabit(el.getAttribute('data-delete')); });
+
+    const bindGoal = (id, field) => { const el=document.getElementById(id); if(el) el.oninput = e => setWeeklyGoal(field, e.target.value); };
+    bindGoal('goal-step','dailyStepGoal'); bindGoal('goal-calorie','dailyCalorieGoal'); bindGoal('goal-protein','dailyProteinGoal'); bindGoal('goal-fats','dailyFatsGoal'); bindGoal('goal-carbs','dailyCarbsGoal');
+
+    drawLineChart(document.getElementById('weight-chart'), weeklyWeight, targetWeight);
+    drawBarChart(document.getElementById('steps-chart'), weeklySteps, Math.max(...weeklySteps.map(x=>x.value), getCurrentWeekGoal().stepGoal || 1));
+  }
+
+  rerender();
+})();
+</script>
+</body>
+</html>
